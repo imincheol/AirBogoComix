@@ -11,5 +11,5 @@ flashvars
 
 ex)
 ```
-<param name="flashvars" value="url=http://comix.airbogo.com:31257/" />
+<param name="flashvars" value="url=http://localhost:31267/" />
 ```
