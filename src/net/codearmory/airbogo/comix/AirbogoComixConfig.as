@@ -8,7 +8,9 @@ package net.codearmory.airbogo.comix
 		// Build
 		//----------------------------------------------------------------------------------------------------
 		
-		static public const VERSION:String = "v18.10.1521";
+		static public const VERSION:String = "v18.10.152";
+		// 미리 앞 2장 더 불러오기
+		// 10장 까지만 기억해두기 
 		
 //		static public const VERSION:String = "v18.10.151";
 		// 이미지 목록도 정렬함 
@@ -40,18 +42,14 @@ package net.codearmory.airbogo.comix
 		// Config
 		//----------------------------------------------------------------------------------------------------
 		
-		static private var _PROTOCOL:String = "http://";
-		static private var _HOST:String = "localhost";
-		static private var _PORT:String = "31267";
+//		static private var _PROTOCOL:String = "http://";
+//		static private var _HOST:String = "localhost";
+//		static private var _PORT:String = "31267";
 		
 		static public function get DOMAIN():String
 		{
-			
 			var paramObj:Object = FlexGlobals.topLevelApplication.parameters;
-//			Alert.show("url: " + paramObj["url"], ObjectUtil.toString(paramObj) + "");
-//			Alert.show("server: " + paramObj["server"], "server: " + paramObj["server"]);
-			
-			var url:String = paramObj["url"] || (_PROTOCOL + _HOST + ":" + _PORT+ "/");
+			var url:String = paramObj["url"];
 			return url;
 		}
 		
