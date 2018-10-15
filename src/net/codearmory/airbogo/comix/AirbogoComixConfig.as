@@ -8,7 +8,9 @@ package net.codearmory.airbogo.comix
 		// Build
 		//----------------------------------------------------------------------------------------------------
 		
-		static public const VERSION:String = "v18.10.151";
+		static public const VERSION:String = "v18.10.1521";
+		
+//		static public const VERSION:String = "v18.10.151";
 		// 이미지 목록도 정렬함 
 		
 //		static public const VERSION:String = "v18.09.192";

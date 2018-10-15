@@ -258,12 +258,15 @@
 			// Image View
 			//----------------------------------------------------------------------------------------------------
 			
-			private var _currentImages:Array = [];
+			private var _imageUrls:Array = [];
+			private var _imageSourceMap:Object = {};
+			
 			private var _currentIndex:int = -1;
 			private function showImages( images:Array ):void
 			{
 				trace("[log] showImages");
-				_currentImages = images;
+				_imageUrls = images;
+				_imageSourceMap = {};
 				
 				viewModeList.visible = false; // Hide List
 				viewModeComix.visible = true; // Show Image
@@ -272,31 +275,82 @@
 				showComixAt( 0 );
 			}
 			
-			private function showComixAt(index:int):void
+			private function showComixAt(index:int, direction:int=0):void
 			{
 				viewModeComix.visible = true;
 				viewModeComix.setFocus();
 				
 				if ( index < 0 ) index = 0;
-				if ( index > _currentImages.length - 1) index = _currentImages.length - 1;
+				if ( index > _imageUrls.length - 1) index = _imageUrls.length - 1;
 				_currentIndex = index;
 				
 				viewCurrentPage.value = (_currentIndex + 1 );
-				viewCurrentPage.maximum = _currentImages.length;
-				viewPageStatus.text = " / " + _currentImages.length;
+				viewCurrentPage.maximum = _imageUrls.length;
+				viewPageStatus.text = " / " + _imageUrls.length;
 //				viewPageStatus.text = (_currentIndex + 1 ) + " / " + _currentImages.length;
 				
-				var url:String = getUrl() + "/" + _currentImages[index];
-				viewImage.source = url;
-				trace( "load image : " + url );
-				MyLibManager.SELF.saveBook( url );
+				// Currnt
+				var currentUrl:String = getImageUrl(index);
+				MyLibManager.SELF.saveBook( currentUrl );
+				trace( "load current image : " + currentUrl );
+				
+				var isLoaded:Boolean = _imageSourceMap[currentUrl];
+				if ( isLoaded ) {
+					var imageData:Object = _imageSourceMap[currentUrl].bitmapData;
+					viewImageCurrent.source = imageData;
+				} else {
+					loadImage(viewImageLoadCurrent, currentUrl);
+				}
+				
+				// Prev
+				if ( index > 0 ) {
+					var prevUrl:String = getImageUrl(index - 1);
+					if ( ! _imageSourceMap[prevUrl] ) {
+						loadImage(viewImageLoadPrevious, prevUrl);	
+					}
+				}
+				// Next 
+				if ( index < _imageUrls.length - 1 ) {
+					var nextUrl:String = getImageUrl(index + 1);
+					if ( ! _imageSourceMap[nextUrl] ) {
+						loadImage(viewImageLoadNext, nextUrl);	
+					}
+				}
 				
 				resetButtons();
 			}
+			private function _showCurrentImage():void 
+			{
+				var currentUrl:String = getImageUrl(_currentIndex);
+				var imageData:Object = _imageSourceMap[currentUrl].bitmapData;
+				viewImageCurrent.source = imageData;
+			}
+			
+			private function getImageUrl(index:int):String
+			{
+				return getUrl() + "/" + _imageUrls[index];
+			}
+			private function loadImage(viewImageLoader:Image, url:String):void
+			{
+				_imageSourceMap[url] = {
+					bitmapData: null
+				};
+				
+				viewImageLoader.source = url;
+			}
+			protected function viewImageLoadCurrent_completeHandler(event:Event):void
+			{
+				var viewImageLoader:Image = event.currentTarget as Image;
+				var url:String = viewImageLoader.source as String;
+				_imageSourceMap[url].bitmapData = viewImageLoader.bitmapData;
+				
+				_showCurrentImage();
+			}
+			
 			private function resetButtons():void
 			{
 				var isFirst:Boolean = 0 == _currentIndex;
-				var isLast:Boolean = (_currentImages.length - 1) == _currentIndex;
+				var isLast:Boolean = (_imageUrls.length - 1) == _currentIndex;
 				if ( readRight ) {
 					viewButtonLeft.visible = !isFirst;
 					viewButtonRight.visible = !isLast;	
@@ -308,7 +362,7 @@
 			}
 			private function showComixBy(direction:int):void
 			{
-				showComixAt( _currentIndex + direction );
+				showComixAt( _currentIndex + direction, direction );
 			}
 			
 			//----------------------------------------------------------------------------------------------------
@@ -397,7 +451,7 @@
 			{
 				trace("[log] viewCheckImageSmooth_changeHandler");
 				var smoothOn:Boolean = viewCheckImageSmooth.selected;
-				viewImage.smooth = smoothOn;
+				viewImageCurrent.smooth = smoothOn;
 			}
 			
 			protected function viewSearchDirectory_changeHandler(event:TextOperationEvent):void
@@ -460,7 +514,7 @@
 						showDir( goDir );
 					} else if ( goSubDirs.length == 1 ) {
 						var page:String = goSubDirs.shift();
-						var index:int = _currentImages.indexOf( page );
+						var index:int = _imageUrls.indexOf( page );
 						showComixAt( index );
 					}
 					return;
@@ -594,7 +648,7 @@
 			
 			protected function viewImage_clickHandler(event:MouseEvent):void
 			{
-				viewImage.setFocus();
+				viewImageCurrent.setFocus();
 			}
 			
 		]]>
@@ -633,7 +687,15 @@
 		
 		<!-- Image -->
 		<s:Group width="100%" height="100%">
-			<s:Image id="viewImage" width="100%" height="100%" smooth="{imageSmooth}" click="viewImage_clickHandler(event)" />
+			<s:Image id="viewImageLoadPrevious" width="100%" height="100%" visible="false" complete="viewImageLoadCurrent_completeHandler(event)" />
+			<s:Image id="viewImageLoadCurrent" width="100%" height="100%" visible="false" complete="viewImageLoadCurrent_completeHandler(event)" />
+			<s:Image id="viewImageLoadNext" width="100%" height="100%" visible="false" complete="viewImageLoadCurrent_completeHandler(event)" />
+			
+			<s:Image id="viewImageLoader1" width="100%" height="100%" visible="false" complete="viewImageLoader1_completeHandler(event)" />
+			<s:Image id="viewImageLoader2" width="100%" height="100%" visible="false" complete="viewImageLoader2_completeHandler(event)" />
+			<s:Image id="viewImageLoader3" width="100%" height="100%" visible="false" complete="viewImageLoader3_completeHandler(event)" />
+			
+			<s:Image id="viewImageCurrent" width="100%" height="100%" smooth="{imageSmooth}" click="viewImage_clickHandler(event)" />
 		</s:Group>
 		
 		<!-- Control -->
