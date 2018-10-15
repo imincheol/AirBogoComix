@@ -1,0 +1,190 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Group 
+	xmlns:fx="http://ns.adobe.com/mxml/2009" 
+	xmlns:s="library://ns.adobe.com/flex/spark" 
+	xmlns:mx="library://ns.adobe.com/flex/mx" 
+	xmlns:ui="com.lovesmh.lib.ui.*"
+	
+	xmlns:view="net.codearmory.airbogo.comix.view.*"
+	preinitialize="group1_preinitializeHandler(event)"
+	creationComplete="group1_creationCompleteHandler(event)" 
+	>
+	
+	<fx:Script>
+		<![CDATA[
+			import com.lovesmh.lib.util.LoadManager;
+			
+			import mx.events.FlexEvent;
+			
+			import net.codearmory.airbogo.comix.manager.LoadingViewManager;
+			import net.codearmory.airbogo.comix.manager.MainViewManager;
+			import net.codearmory.airbogo.comix.view.TabComixList;
+			import net.codearmory.airbogo.comix.view.TabMyLib;
+			
+			
+			//----------------------------------------------------------------------------------------------------
+			// Variable
+			//----------------------------------------------------------------------------------------------------
+			
+			private const FLAG_HOME:String = "HOME";
+			private const FLAG_BACK:String = "..뒤로";
+			
+			[Bindable] private var currentDir:String = AirbogoComixConfig.NAME;
+			
+			//----------------------------------------------------------------------------------------------------
+			// Init
+			//----------------------------------------------------------------------------------------------------
+			
+			protected function group1_preinitializeHandler(event:FlexEvent):void
+			{
+				trace("[Main] pre ");
+				LoadingViewManager.SELF.initView( viewLoading );
+				MainViewManager.SELF.initMainView( this );
+//				login("AirComix", "bfd45234fd");
+			}
+			
+			protected function group1_creationCompleteHandler(event:FlexEvent):void
+			{
+				trace("[Main] creation ");
+//				login("AirComix", "bfd45234fd");
+//				doWork("AirComix", "bfd45234fd");
+			}
+			
+			//----------------------------------------------------------------------------------------------------
+			// Login
+			//----------------------------------------------------------------------------------------------------
+			
+//			private function doWork(id:String, pw:String):void
+//			{
+//				var hostname:String = AirbogoComixConfig.DOMAIN + "";
+//				var user:String = id;
+//				var password:String = pw;
+//				
+//				URLRequestDefaults.setLoginCredentialsForHost(hostname, user, password);
+//				URLRequestDefaults.authenticate = true;
+//				
+//				var req:URLRequest = new URLRequest(AirbogoComixConfig.DOMAIN);
+//				req.method = URLRequestMethod.POST;
+//				req.data = new URLVariables("name="+id);
+//				
+//				var encoder:Base64Encoder = new Base64Encoder();        
+//				encoder.encode(id+":"+pw);
+//				
+//				var credsHeader:URLRequestHeader = new URLRequestHeader("Authorization", "Basic " + encoder.toString());
+//				req.requestHeaders.push(credsHeader);
+//				
+//				var loader:URLLoader = new URLLoader();
+//				loader.load(req);
+//				loader.addEventListener(Event.COMPLETE, function (event):void{
+//					trace("doWork complete");
+//					showHomeDir();
+//				});
+//				
+//			}
+			
+			private function login(id:String, pw:String):void
+			{
+				showLoading();
+				
+				var url:String = AirbogoComixConfig.DOMAIN + "";
+				trace("Login : " + url );
+
+				url = encodeURI( url );
+				LoadManager.load(url, onLoginCompleteHandler, onLoginErrorHandler);
+			}
+			
+			private function onLoginCompleteHandler(event:Event, data:* ):void
+			{
+				hideLoading();
+				
+//				// 1. 만화\n2. 소설\n3. 잡지\n4. 교재\n5. 기타\n6. 추천\n7. 보고북\n8. Secret\n
+//				//trace(data);
+//				var result:String = data;
+//				result = StringUtil.trim(result);
+//				var list:Array = result.split("\n");
+//				viewDirectoryList.dataProvider = new ArrayCollection(list);
+			}
+			
+			private function onLoginErrorHandler(event:Event):void
+			{
+//				Alert.show(event.toString());
+				//Alert.show("로그인 오류", "프로그램을 재실행해주세요");	
+			}
+			
+			//----------------------------------------------------------------------------------------------------
+			// Loading View
+			//----------------------------------------------------------------------------------------------------
+			
+			private function showLoading():void
+			{
+				viewLoading.visible = true;
+			}
+			
+			private function hideLoading():void
+			{
+				viewLoading.visible = false;
+			}
+			
+			//----------------------------------------------------------------------------------------------------
+			// View Manager
+			//----------------------------------------------------------------------------------------------------
+			
+//			private var viewTabComixList:TabComixList = null;
+			public function showComixList():void
+			{
+				if ( ! viewTabComixList ) {
+					viewTabComixList = new TabComixList();
+					viewTabComixList.percentWidth = viewTabComixList.percentHeight = 100;
+				}
+				
+				viewContainer.removeAllElements();
+				viewContainer.addElement( viewTabComixList );
+			}
+			
+			private var viewTabMyLib:TabMyLib = null;
+			public function showMyLibList():void
+			{
+				if ( !viewTabMyLib ) {
+					viewTabMyLib = new TabMyLib();
+					viewTabMyLib.percentWidth = viewTabMyLib.percentHeight = 100;
+				}
+				
+				viewContainer.removeAllElements();
+				viewContainer.addElement( viewTabMyLib );
+				
+				viewTabMyLib.loadMyLibList();
+			}
+			
+			public function showHome():void
+			{
+				viewContainer.removeAllElements();
+				viewContainer.addElement( viewHome );
+			}
+			
+			public function showComixPage(fullPath:String):void
+			{
+				showComixList();
+				
+				viewTabComixList.goDir(fullPath);
+			}
+			
+		]]>
+	</fx:Script>
+	
+	<ui:BGBox borderAlpha="0" />
+	<ui:BGBox backgroundName="blue" alpha="0.1" />
+	
+	<s:Group id="viewContainer" width="100%" height="100%">
+		<view:TabComixList id="viewTabComixList" width="100%" height="100%" />
+		<view:TabHome id="viewHome" width="100%" height="100%" />
+	</s:Group>
+	
+	<s:Group id="viewLoading" width="100%" height="100%" visible="false">
+		<ui:BGBox backgroundName="black" alpha="0.5" />
+		<s:VGroup horizontalCenter="0" verticalCenter="0" >
+			<s:Label text="Loading..." color="white" fontSize="50" />
+			<s:Label text="(version: {AirbogoComixConfig.VERSION})" color="white" fontSize="30" />
+		</s:VGroup>
+	</s:Group>
+
+</s:Group>

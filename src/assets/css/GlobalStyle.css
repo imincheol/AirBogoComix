@@ -1,0 +1,22 @@
+@namespace s "library://ns.adobe.com/flex/spark";
+@namespace mx "library://ns.adobe.com/flex/mx";
+@namespace util "com.lovesmh.app.util.*";
+@namespace view "view.*";
+
+@font-face {
+	src: url("/assets/font/NanumGothic.ttf");
+	fontFamily: MyNanumGothic;
+	embedAsCFF: true;
+}
+@font-face {
+	src: url("/assets/font/NanumGothic.ttf");
+	fontFamily: MyNanumGothicMX;
+	embedAsCFF: false;
+}
+
+global
+{
+/*	fontFamily: MyNanumGothic, Gulim, Nanumgothic, Malgun Gothic, MalgunGothic;*/
+	fontFamily: MyNanumGothic;
+	fontSize : 15px;
+}

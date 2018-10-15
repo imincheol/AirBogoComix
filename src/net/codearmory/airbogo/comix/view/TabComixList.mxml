@@ -1,0 +1,680 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Group 
+	xmlns:fx="http://ns.adobe.com/mxml/2009" 
+	xmlns:s="library://ns.adobe.com/flex/spark" 
+	xmlns:mx="library://ns.adobe.com/flex/mx" 
+	xmlns:ui="com.lovesmh.lib.ui.*"
+	
+	creationComplete="group1_creationCompleteHandler(event)"
+	>
+	
+	<fx:Script>
+		<![CDATA[
+			import com.lovesmh.lib.util.LoadManager;
+			
+			import flash.utils.Timer;
+			
+			import mx.collections.ArrayCollection;
+			import mx.collections.Sort;
+			import mx.core.FlexGlobals;
+			import mx.events.DynamicEvent;
+			import mx.events.FlexEvent;
+			import mx.utils.StringUtil;
+			
+			import spark.components.Application;
+			import spark.components.RichEditableText;
+			import spark.events.IndexChangeEvent;
+			import spark.events.TextOperationEvent;
+			
+			import net.codearmory.airbogo.comix.AirbogoComixConfig;
+			import net.codearmory.airbogo.comix.manager.LoadingViewManager;
+			import net.codearmory.airbogo.comix.manager.MainViewManager;
+			import net.codearmory.airbogo.comix.manager.MyLibManager;
+			
+			
+			//----------------------------------------------------------------------------------------------------
+			// Variable
+			//----------------------------------------------------------------------------------------------------
+			
+			private const FLAG_HOME:String = "HOME";
+			private const FLAG_BACK:String = "..뒤로";
+			
+			[Bindable] private var isHome:Boolean = true;
+			
+			[Bindable] private var currentDir:String = AirbogoComixConfig.NAME;
+			
+			//----------------------------------------------------------------------------------------------------
+			// Init
+			//----------------------------------------------------------------------------------------------------
+			
+			protected function group1_creationCompleteHandler(event:FlexEvent):void
+			{
+				var app:Application = FlexGlobals.topLevelApplication as Application;
+				app.addEventListener(FullScreenEvent.FULL_SCREEN, fullScreenHandler);
+				app.addEventListener(KeyboardEvent.KEY_UP, application_keyUpHandler);
+				
+				viewModeComix.addEventListener(MouseEvent.ROLL_OVER, viewModeComix_rollOverHandler);
+				viewModeComix.addEventListener(MouseEvent.ROLL_OUT, viewModeComix_rollOutHandler);
+				
+				login("AirComix", "bfd45234fd");
+			}
+			
+			//----------------------------------------------------------------------------------------------------
+			// Login
+			//----------------------------------------------------------------------------------------------------
+			private function login(id:String, pw:String):void
+			{
+				showHome();
+			}
+			
+			private function showHome():void
+			{
+				showLoading();
+				
+				subDirs = [];
+				
+				var url:String = AirbogoComixConfig.DOMAIN + "";
+				trace("Login : " + url );
+				
+				url = encodeURI( url );
+				LoadManager.load(url, onLoginCompleteHandler, onLoginErrorHandler, false);
+			}
+			
+			private function onLoginCompleteHandler(event:Event, data:* ):void
+			{
+				hideLoading();
+				
+				// 1. 만화\n2. 소설\n3. 잡지\n4. 교재\n5. 기타\n6. 추천\n7. 보고북\n8. Secret\n
+				//trace(data);
+				var result:String = data;
+				result = StringUtil.trim(result);
+				var list:Array = result.split("\n");
+				viewDirectoryList.dataProvider = new ArrayCollection(list);
+			}
+			
+			private function onLoginErrorHandler(event:Event):void
+			{
+				//				Alert.show(event.toString());
+				//Alert.show("로그인 오류", "프로그램을 재실행해주세요");	
+			}
+			
+			//----------------------------------------------------------------------------------------------------
+			// Dir List
+			//----------------------------------------------------------------------------------------------------
+			
+			protected function viewButtonHome_clickHandler(event:MouseEvent):void
+			{
+				subDirs = [];
+				loadCurrentDir();
+				
+				MainViewManager.SELF.showHome();
+			}
+			
+			protected function viewList_changeHandler(event:IndexChangeEvent):void
+			{
+				var index:int = event.newIndex;
+				var dirName:String = viewDirectoryList.dataProvider.getItemAt( index ) + "";
+				showDir( dirName );
+			}
+			
+			private var subDirs:Array = [];
+			private function showDir(dir:String):void
+			{
+				viewModeList.visible = true;
+				viewModeComix.visible = false;
+				viewSearchDirectory.text = "";
+				
+				trace("select dir : " + dir );
+				
+				var isBack:Boolean = (FLAG_BACK == dir);
+				if ( isBack ) {
+					subDirs.pop();
+				}
+				else {
+					// go directory
+					subDirs.push(dir);
+				}
+				
+				loadCurrentDir();
+			}
+			
+			private function loadCurrentDir():void
+			{
+				trace("[log] loadCurrentDir");
+				showLoading();
+				
+				var url:String = getUrl();
+				trace("load directory : " + url );
+				
+				url = encodeURI( url );
+				LoadManager.load(url, loadUrl_completeHandler, loadUrl_errorHandler, false);
+			}
+			
+			private function getUrl():String
+			{
+				var url:String = AirbogoComixConfig.DOMAIN;
+				if ( subDirs.length > 0 ) {
+					url += subDirs.join("/");
+				}
+				return url;
+			}
+			
+			private function loadUrl_completeHandler(event:Event, data:* ):void
+			{
+				hideLoading();
+				
+				//				trace( typeof(data) );
+				
+				var dp:ArrayCollection = null;
+				
+				var result:String = data;
+				result = StringUtil.trim(result);
+				var list:Array = result.split("\n");
+				list = sortDescending(list);
+				trace(list);
+				if ( list && list.length > 0 ) {
+					
+					// Check isImage
+					var isImage:Boolean = isImageList(list);
+					if ( isImage ) {
+						showImages( list );
+					}
+					else {
+						var isRoot:Boolean = subDirs.length < 1;
+						if ( isRoot ) {
+							isHome = true;
+							currentDir = AirbogoComixConfig.NAME;
+						}
+						else {
+							isHome = false;
+							list = [FLAG_BACK].concat(list);
+							currentDir = subDirs[subDirs.length - 1];
+						}
+						
+						// is Directory
+						dp = new ArrayCollection(list);
+						
+						var sort:Sort = new Sort();
+						dp.sort = sort;
+						dp.refresh();
+					}
+				}
+				viewDirectoryList.dataProvider = dp;
+				
+				var e:DynamicEvent = new DynamicEvent( "loadCurrentDir" );
+				e.success = true;
+				dispatchEvent( e );
+			}
+			private function sortDescending(list:Array):Array
+			{
+				list.sort();
+				return list;
+			}
+			
+			private function isImageList(list:Array):Boolean
+			{
+				var result:Boolean = false;
+				var firstItemName:String = list[0];
+				firstItemName = firstItemName.toLowerCase();
+				
+				const IMAGE_EXTS:Array = ["jpg", "gif", "png", "tif", "bmp", "jpeg", "tiff"];
+				for each ( var eachExt:String in IMAGE_EXTS ) {
+					if ( checkExt(firstItemName, eachExt) ) {
+						result = true;
+						break;
+					}
+				}
+				return result;
+			}
+			private function checkExt(fileName:String, ext:String):Boolean
+			{
+				var result:Boolean = false;
+				
+				if ( fileName ) {
+					var index:int = fileName.indexOf( "." + ext );
+					if ( index > 0 ) {
+						if ( index == fileName.length - 4 ) {
+							result = true;
+						}
+					}
+				}
+				
+				return result;
+			}
+			
+			private function loadUrl_errorHandler(event:Event):void
+			{
+				hideLoading();
+				
+				trace(event);
+				//Alert.show("폴더 불러오기 오류", "다시 시도해주세요");
+				
+				var e:DynamicEvent = new DynamicEvent( "loadCurrentDir" );
+				e.success = false;
+				dispatchEvent( e );
+			}
+			
+			//----------------------------------------------------------------------------------------------------
+			// Image View
+			//----------------------------------------------------------------------------------------------------
+			
+			private var _currentImages:Array = [];
+			private var _currentIndex:int = -1;
+			private function showImages( images:Array ):void
+			{
+				trace("[log] showImages");
+				_currentImages = images;
+				
+				viewModeList.visible = false; // Hide List
+				viewModeComix.visible = true; // Show Image
+				viewModeComix.setFocus();
+				
+				showComixAt( 0 );
+			}
+			
+			private function showComixAt(index:int):void
+			{
+				viewModeComix.visible = true;
+				viewModeComix.setFocus();
+				
+				if ( index < 0 ) index = 0;
+				if ( index > _currentImages.length - 1) index = _currentImages.length - 1;
+				_currentIndex = index;
+				
+				viewCurrentPage.value = (_currentIndex + 1 );
+				viewCurrentPage.maximum = _currentImages.length;
+				viewPageStatus.text = " / " + _currentImages.length;
+//				viewPageStatus.text = (_currentIndex + 1 ) + " / " + _currentImages.length;
+				
+				var url:String = getUrl() + "/" + _currentImages[index];
+				viewImage.source = url;
+				trace( "load image : " + url );
+				MyLibManager.SELF.saveBook( url );
+				
+				resetButtons();
+			}
+			private function resetButtons():void
+			{
+				var isFirst:Boolean = 0 == _currentIndex;
+				var isLast:Boolean = (_currentImages.length - 1) == _currentIndex;
+				if ( readRight ) {
+					viewButtonLeft.visible = !isFirst;
+					viewButtonRight.visible = !isLast;	
+				}
+				else {
+					viewButtonLeft.visible = !isLast;
+					viewButtonRight.visible = !isFirst;
+				}
+			}
+			private function showComixBy(direction:int):void
+			{
+				showComixAt( _currentIndex + direction );
+			}
+			
+			//----------------------------------------------------------------------------------------------------
+			// Loading View
+			//----------------------------------------------------------------------------------------------------
+			
+			private function showLoading():void
+			{
+				LoadingViewManager.SELF.show();
+			}
+			
+			private function hideLoading():void
+			{
+				LoadingViewManager.SELF.hide();
+			}
+			
+			protected function viewButtonLeft_clickHandler(event:MouseEvent):void
+			{
+				moveLeft();
+			}
+			
+			protected function viewButtonRight_clickHandler(event:MouseEvent):void
+			{
+				moveRight();
+			}
+			
+			private function moveLeft():void
+			{
+				if ( viewModeComix ) {
+					showComixBy( readRight ? -1 : +1 );
+				}				
+			}
+			private function moveRight():void
+			{
+				if ( viewModeComix ) {
+					showComixBy( readRight ? +1 : -1 );	
+				}
+			}
+			
+			protected function viewButtonBack_clickHandler(event:MouseEvent):void
+			{
+				showDir(FLAG_BACK);
+			}
+			
+			//----------------------------------------------------------------------------------------------------
+			// Keyboard
+			//----------------------------------------------------------------------------------------------------
+			
+			protected function application_keyUpHandler(event:KeyboardEvent):void
+			{
+				if ( viewModeComix.visible == false ) {
+					return;
+				}
+				var invalidatTarget:Boolean = 
+					event.target is NumericStepper 
+					|| event.target is RichEditableText
+					;
+				if ( invalidatTarget ) { 
+					return;
+				}
+
+				var keyCode:uint = event.keyCode;
+				trace( event.target ); 
+				
+//				trace(keyCode, Keyboard.LEFT, Keyboard.RIGHT);
+				switch (keyCode) {
+					case Keyboard.LEFT :
+						moveLeft();
+						break;
+					case Keyboard.RIGHT : 
+						moveRight();
+						break;
+				}
+				
+				
+			}
+			
+			//----------------------------------------------------------------------------------------------------
+			// Option
+			//----------------------------------------------------------------------------------------------------
+			
+			[Bindable] public var imageSmooth:Boolean = true;
+			[Bindable] public var readRight:Boolean = true;
+			
+			protected function viewCheckImageSmooth_changeHandler(event:Event):void
+			{
+				trace("[log] viewCheckImageSmooth_changeHandler");
+				var smoothOn:Boolean = viewCheckImageSmooth.selected;
+				viewImage.smooth = smoothOn;
+			}
+			
+			protected function viewSearchDirectory_changeHandler(event:TextOperationEvent):void
+			{
+				trace("[log] viewSearchDirectory_changeHandler");
+				var searchName:String = viewSearchDirectory.text;
+				var dp:ArrayCollection = viewDirectoryList.dataProvider as ArrayCollection;
+				
+				if ( searchName ) {
+					dp.filterFunction = filter_searchDirectory;
+				}
+				else {
+					dp.filterFunction = null;	
+				}
+				dp.refresh();
+			}
+			private function filter_searchDirectory(item:Object):Boolean
+			{
+				var searchName:String = viewSearchDirectory.text;
+				if ( item ) {
+					return String(item).indexOf( searchName ) > -1;
+				}
+				return false;
+			}
+			
+			protected function viewCheckReadRight_changeHandler(event:Event):void
+			{
+				readRight = viewCheckReadRight.selected;
+				resetButtons();
+			}
+			
+			protected function viewButtonDir_clickHandler(event:MouseEvent):void
+			{
+				showDir(FLAG_BACK);
+			}
+			
+			private var goSubDirs:Array = [];
+			public function goDir(fullPath:String):void
+			{
+				showHome();
+				var domain:String = AirbogoComixConfig.DOMAIN;
+				var subDirBeginIndex:int = domain.length;
+				var subPath:String = fullPath.substr(subDirBeginIndex);
+				trace( "subPath : " + subPath );
+				goSubDirs = subPath.split("/");
+				//				var goSubDirs:Array = subPath.split("/");
+				//				while ( goSubDirs.length > 1 ) {
+				var goDir:String = goSubDirs.shift();
+				showDir( goDir );
+				//				}
+				
+				this.addEventListener("loadCurrentDir", goDirHandler);
+			}
+			
+			private function goDirHandler(event:DynamicEvent):void
+			{
+				if ( event.success ) {
+					if ( goSubDirs.length > 1 ) {
+						var goDir:String = goSubDirs.shift();
+						showDir( goDir );
+					} else if ( goSubDirs.length == 1 ) {
+						var page:String = goSubDirs.shift();
+						var index:int = _currentImages.indexOf( page );
+						showComixAt( index );
+					}
+					return;
+				}
+				
+				this.removeEventListener("loadCurrentDir", goDirHandler);	
+			}
+			
+			
+			//----------------------------------------------------------------------------------------------------
+			// AutoRead
+			//----------------------------------------------------------------------------------------------------
+			
+			
+			private var autoReadTimer:Timer = null;
+			protected function viewButtonAutoReadPlayStop_changeHandler(event:Event):void
+			{
+				var toPlay:Boolean = viewButtonAutoReadPlayStop.selected;
+				viewAutoReadInterval.enabled = !toPlay;
+				
+				var interval:int = viewAutoReadInterval.value * 1000;
+				if ( !autoReadTimer ) {
+					autoReadTimer = new Timer( interval );
+					autoReadTimer.addEventListener(TimerEvent.TIMER, autoRead_timerHandler );
+				}
+				
+				autoReadTimer.delay = interval;
+				if ( toPlay ) {
+					autoReadTimer.start();
+				}
+				else {
+					autoReadTimer.stop();
+				}
+			}
+			
+			protected function autoRead_timerHandler(event:TimerEvent):void
+			{
+				moveRight();
+			}
+			
+			protected function viewButtonFullScreen_clickHandler(event:MouseEvent):void
+			{
+				toggleFullScreen();
+			}
+			
+			private function fullScreenHandler(evt:FullScreenEvent):void 
+			{
+				if (evt.fullScreen) 
+				{
+					/* Do something specific here if we switched to full screen mode. */
+					fullScreenState = StageDisplayState.FULL_SCREEN;
+				} else 
+				{
+					/* Do something specific here if we switched to normal mode. */
+					fullScreenState = StageDisplayState.NORMAL;
+				}
+			}
+			
+			private var fullScreenState:String = StageDisplayState.NORMAL;
+			private function toggleFullScreen():void 
+			{
+				if (fullScreenState == StageDisplayState.NORMAL) {
+					fullScreenState = StageDisplayState.FULL_SCREEN;
+				} else {
+					fullScreenState = StageDisplayState.NORMAL;
+				}
+				
+				try {
+					stage.displayState = fullScreenState;
+				} catch (any:*) {
+					// ignore
+				}
+			}
+			
+			protected function viewModeComix_rollOverHandler(event:MouseEvent):void
+			{
+				showControlUI();
+				
+				if ( ! viewModeComix.hasEventListener(MouseEvent.MOUSE_MOVE) ) {
+					viewModeComix.addEventListener(MouseEvent.MOUSE_MOVE, viewModeComix_mouseMoveHandler);
+				}
+			}
+			
+			protected function viewModeComix_rollOutHandler(event:MouseEvent):void
+			{
+				hideControlUI();
+				
+				if ( viewModeComix.hasEventListener(MouseEvent.MOUSE_MOVE) ) {
+					viewModeComix.removeEventListener(MouseEvent.MOUSE_MOVE, viewModeComix_mouseMoveHandler);
+				}
+			}
+			
+			protected function viewModeComix_mouseMoveHandler(event:MouseEvent):void
+			{
+				showControlUI();
+			}
+			
+			private var hideTimer:Timer = null;
+			private var hideTimeOut:int = 3;
+			private function showControlUI():void
+			{
+				viewControlArea.visible = true;
+				
+				hideTimeOut = 3;
+				if ( !hideTimer ) {
+					hideTimer = new Timer(1000);
+					hideTimer.addEventListener(TimerEvent.TIMER, hideTimer_timerHandler);
+					hideTimer.start();
+				}
+			}
+			private function hideControlUI():void
+			{
+				viewControlArea.visible = false;
+				
+//				hideTimer.stop();
+			}
+			
+			protected function hideTimer_timerHandler(event:TimerEvent):void
+			{
+				hideTimeOut -= 1;
+				
+				if ( hideTimeOut < 0 ) {
+					hideControlUI();
+				}
+			}
+			
+			protected function viewCurrentPage_changeHandler(event:Event):void
+			{
+				showComixAt( viewCurrentPage.value - 1 );
+			}
+			
+			protected function viewImage_clickHandler(event:MouseEvent):void
+			{
+				viewImage.setFocus();
+			}
+			
+		]]>
+	</fx:Script>
+	
+	<ui:BGBox borderAlpha="0" />
+	<ui:BGBox backgroundName="blue" alpha="0.1" />
+	
+	<s:Group id="viewModeList" width="100%" height="100%">
+		<s:VGroup width="100%" height="100%" gap="0">
+			<s:Group width="100%">
+				<ui:BGBox backgroundName="black" alpha="0.5" />
+				<ui:BGBox backgroundName="white" alpha="0.5" />
+				<s:HGroup width="100%" gap="10"
+						  verticalAlign="middle"
+						  paddingLeft="10" paddingRight="10" paddingTop="10" paddingBottom="10"
+						  >
+					<s:Button label="{FLAG_HOME}" click="viewButtonHome_clickHandler(event)" />
+					<s:Button label="{currentDir}" click="viewButtonDir_clickHandler(event)" />
+					<s:Spacer width="100%" minWidth="0" />
+					<s:Label text="검색" />
+					<s:TextInput id="viewSearchDirectory" width="200" change="viewSearchDirectory_changeHandler(event)" />
+					<s:Label text="{AirbogoComixConfig.VERSION}" />
+				</s:HGroup>
+			</s:Group>
+			<s:List id="viewDirectoryList" 
+					width="100%" height="100%" 
+					change="viewList_changeHandler(event)"
+					itemRenderer="net.codearmory.airbogo.comix.view.ComixPageListItemRenderer "
+					>
+			</s:List>			
+		</s:VGroup>
+	</s:Group>
+	
+	<s:Group id="viewModeComix" width="100%" height="100%" visible="false">
+		
+		<!-- Image -->
+		<s:Group width="100%" height="100%">
+			<s:Image id="viewImage" width="100%" height="100%" smooth="{imageSmooth}" click="viewImage_clickHandler(event)" />
+		</s:Group>
+		
+		<!-- Control -->
+		<s:VGroup id="viewControlArea" width="100%" height="100%" gap="0" >
+			
+			<s:Group width="100%">
+				<ui:BGBox backgroundName="white" backgroundAlpha="0.3" />
+				<s:HGroup width="100%" verticalAlign="middle"
+						  paddingLeft="10" paddingRight="10" paddingTop="10" paddingBottom="10"
+						  >
+					<s:Button id="viewButtonBack" label="Back" click="viewButtonBack_clickHandler(event)" />
+					<s:Spacer width="100%" minWidth="0" />
+					<s:CheckBox id="viewCheckImageSmooth" label="이미지 부드럽게" selected="true" change="viewCheckImageSmooth_changeHandler(event)" />
+					<s:CheckBox id="viewCheckReadRight" label="오른쪽읽기" selected="true" change="viewCheckReadRight_changeHandler(event)" />
+					<s:Spacer width="100%" minWidth="0" />
+					<s:NumericStepper id="viewAutoReadInterval" value="10" minimum="1" maximum="600" />
+					<s:Label text="초" />
+					<s:CheckBox id="viewButtonAutoReadPlayStop" label="자동재생" change="viewButtonAutoReadPlayStop_changeHandler(event)" />
+					<s:Button id="viewButtonFullScreen" label="전체화면" click="viewButtonFullScreen_clickHandler(event)" />
+				</s:HGroup>
+			</s:Group>
+			
+			<s:HGroup width="100%" height="100%" verticalAlign="middle" >
+				<s:Button id="viewButtonLeft" label="&lt;" click="viewButtonLeft_clickHandler(event)" />
+				<s:Spacer width="100%" minWidth="0" />
+				<s:Button id="viewButtonRight" label="&gt;" click="viewButtonRight_clickHandler(event)" />
+			</s:HGroup>
+			
+			<s:Group width="100%">
+				<ui:BGBox backgroundName="white" backgroundAlpha="0.3" />
+				<s:HGroup width="100%" 
+						  paddingLeft="10" paddingRight="10" paddingTop="10" paddingBottom="10"
+						  horizontalAlign="center" verticalAlign="middle"
+						  >
+					<s:NumericStepper id="viewCurrentPage" minimum="0" change="viewCurrentPage_changeHandler(event)" />
+					<s:Label id="viewPageStatus" />
+				</s:HGroup>
+			</s:Group>
+					  
+		</s:VGroup>
+		
+	</s:Group>
+	
+</s:Group>

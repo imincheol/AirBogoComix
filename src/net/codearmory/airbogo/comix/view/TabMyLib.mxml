@@ -1,0 +1,151 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Group 
+	xmlns:fx="http://ns.adobe.com/mxml/2009" 
+	xmlns:s="library://ns.adobe.com/flex/spark" 
+	xmlns:mx="library://ns.adobe.com/flex/mx" 
+	
+	xmlns:ui="com.lovesmh.lib.ui.*"
+	
+	width="400" height="300" 
+	creationComplete="group1_creationCompleteHandler(event)"
+	>
+	<fx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			import mx.events.FlexEvent;
+			
+			import spark.collections.Sort;
+			import spark.collections.SortField;
+			import spark.events.IndexChangeEvent;
+			import spark.events.TextOperationEvent;
+			
+			import net.codearmory.airbogo.comix.AirbogoComixConfig;
+			import net.codearmory.airbogo.comix.manager.MainViewManager;
+			import net.codearmory.airbogo.comix.manager.MyLibManager;
+			
+			//----------------------------------------------------------------------------------------------------
+			// Init 
+			//----------------------------------------------------------------------------------------------------
+			
+			private const FLAG_HOME:String = "HOME";
+			
+			protected function group1_creationCompleteHandler(event:FlexEvent):void
+			{
+				viewMyLibItemList.addEventListener("showMyLib", myLibItem_showHandler );
+				viewMyLibItemList.addEventListener("deleteMyLib", myLibItem_deleteHandler );
+				loadMyLibList();
+			}
+			
+			//----------------------------------------------------------------------------------------------------
+			// MyLib List
+			//----------------------------------------------------------------------------------------------------
+			
+			public function loadMyLibList():void
+			{
+				var books:ArrayCollection = MyLibManager.SELF.loadBooks();
+				var sort:Sort = new Sort();
+				sort.fields = [new SortField("time", true)];
+				books.sort = sort;
+				books.refresh();
+				viewMyLibItemList.dataProvider = books;
+			}
+			
+			//----------------------------------------------------------------------------------------------------
+			// Dir List
+			//----------------------------------------------------------------------------------------------------
+			
+			protected function viewButtonHome_clickHandler(event:MouseEvent):void
+			{
+				MainViewManager.SELF.showHome();
+			}
+			
+			protected function viewSearchDirectory_changeHandler(event:TextOperationEvent):void
+			{
+				trace("[log] viewSearchDirectory_changeHandler");
+				var searchName:String = viewSearchDirectory.text;
+				var dp:ArrayCollection = viewMyLibItemList.dataProvider as ArrayCollection;
+				
+				if ( searchName ) {
+					dp.filterFunction = filter_searchDirectory;
+				}
+				else {
+					dp.filterFunction = null;	
+				}
+				dp.refresh();
+			}
+			private function filter_searchDirectory(item:Object):Boolean
+			{
+				var searchName:String = viewSearchDirectory.text;
+				if ( item ) {
+					return String(item).indexOf( searchName ) > -1;
+				}
+				return false;
+			}
+			
+//			protected function viewList_changeHandler(event:IndexChangeEvent):void
+//			{
+//				var index:int = event.newIndex;
+//				var data:Object = viewMyLibItemList.dataProvider.getItemAt( index );
+//				MainViewManager.SELF.showComixPage( data.path );
+//			}
+			
+			protected function myLibItem_showHandler(event:Event):void
+			{
+				event.stopImmediatePropagation();
+				
+				var item:MyLibListItemRenderer = event.target as MyLibListItemRenderer;
+				var itemData:Object = item.data;
+				
+				MainViewManager.SELF.showComixPage( itemData.path );				
+			}
+			
+			protected function myLibItem_deleteHandler(event:Event):void
+			{
+				event.stopImmediatePropagation();
+				
+				var item:MyLibListItemRenderer = event.target as MyLibListItemRenderer;
+				var itemData:Object = item.data;
+				
+				var bookName:String = itemData.bookName;
+				MyLibManager.SELF.deleteBook(bookName);
+				
+				loadMyLibList();
+			}
+			
+			protected function viewButtonDeleteAllLibs_clickHandler(event:MouseEvent):void
+			{
+				MyLibManager.SELF.deleteAll();
+				loadMyLibList();
+			}
+			
+		]]>
+	</fx:Script>
+	
+	<s:Group id="viewModeList" width="100%" height="100%">
+		<s:VGroup width="100%" height="100%" gap="0">
+			<s:Group width="100%">
+				<ui:BGBox backgroundName="black" alpha="0.5" />
+				<ui:BGBox backgroundName="white" alpha="0.5" />
+				<s:HGroup width="100%" gap="10"
+						  verticalAlign="middle"
+						  paddingLeft="10" paddingRight="10" paddingTop="10" paddingBottom="10"
+						  >
+					<s:Button label="{FLAG_HOME}" click="viewButtonHome_clickHandler(event)" />
+					<s:Label text="나의 서재" />
+					<s:Spacer width="100%" minWidth="0" />
+					<s:Button label="모두 삭제" click="viewButtonDeleteAllLibs_clickHandler(event)" />
+					<s:Label text="검색" />
+					<s:TextInput id="viewSearchDirectory" width="200" change="viewSearchDirectory_changeHandler(event)" />
+					<s:Label text="{AirbogoComixConfig.VERSION}" />
+				</s:HGroup>
+			</s:Group>
+			<s:List id="viewMyLibItemList" 
+					width="100%" height="100%" 
+					itemRenderer="net.codearmory.airbogo.comix.view.MyLibListItemRenderer"
+					>
+			</s:List>			
+		</s:VGroup>
+	</s:Group>
+
+	
+</s:Group>
